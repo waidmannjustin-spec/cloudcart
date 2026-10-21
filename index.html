@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudCart - Shop</title>
+  <!-- Tailwind CSS per CDN einbinden für schnelles & modernes Design -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
+      <h1 class="text-2xl font-bold tracking-wide">🛒 CloudCart</h1>
+      <span class="bg-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-500">Cloud-Native Edition</span>
+    </div>
+  </header>
+
+  <!-- Hauptinhalt -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-xl font-semibold text-gray-700">Unsere Produkte</h2>
+      <button onclick="loadProducts()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition">
+        🔄 Aktualisieren
+      </button>
+    </div>
+
+    <!-- Produkt-Grid -->
+    <div id="product-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Wird dynamisch per JS gefüllt -->
+      <p class="text-gray-500 col-span-3 text-center py-8">Lade Produkte...</p>
+    </div>
+
+    <!-- Status-Anzeige -->
+    <div id="status-message" class="mt-8 hidden p-4 rounded-lg text-center font-medium"></div>
+  </main>
+
+  <script>
+    // Produkte von der Go REST-API laden (/products)
+    async function loadProducts() {
+      const grid = document.getElementById('product-grid');
+      try {
+        const response = await fetch('/products');
+        if (!response.ok) throw new Error('Netzwerkfehler');
+        
+        const products = await response.json();
+        grid.innerHTML = '';
+
+        products.forEach(p => {
+          const price = (p.price_cents / 100).toFixed(2);
+          const card = `
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <span class="text-xs font-bold text-indigo-500 uppercase tracking-wider">ID #${p.id}</span>
+                <h3 class="text-lg font-bold text-gray-900 mt-1">${p.name}</h3>
+                <p class="text-sm text-gray-500 mt-1">Auf Lager: <span class="font-semibold text-gray-700">${p.stock} Stk.</span></p>
+              </div>
+              <div class="mt-6 flex items-center justify-between">
+                <span class="text-xl font-extrabold text-gray-900">${price} €</span>
+                <button onclick="orderProduct('${p.name}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                  Kaufen
+                </button>
+              </div>
+            </div>
+          `;
+          grid.innerHTML += card;
+        });
+      } catch (err) {
+        grid.innerHTML = '<p class="text-red-500 col-span-3 text-center py-8">Fehler beim Laden der Produkte!</p>';
+      }
+    }
+
+    function orderProduct(name) {
+      const status = document.getElementById('status-message');
+      status.className = "mt-8 p-4 rounded-lg text-center font-medium bg-emerald-100 text-emerald-800 border border-emerald-300 block";
+      status.innerText = `✅ Bestellung für "${name}" wurde erfolgreich ausgelöst!`;
+    }
+
+    // Beim Start automatisch laden
+    loadProducts();
+  </script>
+</body>
+</html>

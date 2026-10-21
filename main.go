@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,10 +21,10 @@ type Product struct {
 }
 
 func main() {
-	// Factor XI (Logs): Strukturierter JSON-Logger auf stdout
+	// Factor XI (Logs): Strukturierter JSON-Logger direkt auf stdout
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	// Statische Beispieldaten (Zustandslos bezüglich lokaler Schreibzugriffe)
+	// Statische Beispieldaten (Zustandslos / Stateless gemäß Faktor VI)
 	products := []Product{
 		{ID: 1, Name: "Kopfhoerer", PriceCents: 7999, Stock: 10},
 		{ID: 2, Name: "Tastatur", PriceCents: 4999, Stock: 15},
@@ -34,17 +33,18 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// 1. Root Route
+	// =========================================================
+	// HIER IST SCHRITT 2: Root Route liefert jetzt index.html aus
+	// =========================================================
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintln(w, "<h1>CloudCart</h1><p>Unsere erste Go-API läuft cloud-native!</p><a href='/products'>Produkte anzeigen</a>")
+		http.ServeFile(w, r, "index.html")
 	})
 
-	// 2. Health-Check Route (wichtig für Kubernetes Liveness/Readiness Probes)
+	// 2. Health-Check Route (für Kubernetes Liveness/Readiness Probes)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -52,7 +52,7 @@ func main() {
 		})
 	})
 
-	// 3. REST-API Endpunkt für Produkte (Faktor VII)
+	// 3. REST-API Endpunkt für Produkte (Faktor VII - Port Binding)
 	mux.HandleFunc("GET /products", func(w http.ResponseWriter, r *http.Request) {
 		logger.Info("Abruf der Produktliste", "client_ip", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/json")
@@ -70,7 +70,7 @@ func main() {
 		Handler: mux,
 	}
 
-	// Server in eigener Goroutine starten, damit der Hauptprozess auf Signale lauschen kann
+	// Server in Goroutine starten
 	go func() {
 		logger.Info("CloudCart API startet", "port", port)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -83,16 +83,15 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	<-stop // Warten auf Beendigungssignal von Docker/Kubernetes
+	<-stop
 	logger.Info("Herunterfahren der Anwendung eingeleitet...")
 
-	// Dem Server 5 Sekunden Zeit geben, um laufende Anfragen zu beenden
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Error("Fehler beim sauberen Stoppen des Servers", "error", err)
 	} else {
-		logger.Info("Server erfolgreich und sauber heruntergefahren")
+		logger.Info("Server erfolgreich heruntergefahren")
 	}
 }
